@@ -1,46 +1,121 @@
 # Helpdesk-Search-Assistant
-A backend application that allows users to upload PDF documents and ask questions about their content. The system searches the documents by meaning (not keywords) and returns the most relevant passages along with the document name and page number, enabling accurate and citation-based answers from internal documents.
+
+This project is a FastAPI backend for semantic search over PDF documents. A user can upload a PDF through the `/search` endpoint, ask a question about the file, and get back the most relevant passages based on meaning instead of simple keyword matching.
+
+The API returns:
+- the question that was asked
+- the `top_k` value used for retrieval
+- the most relevant results from the uploaded PDF
 
 # Environment Setup
-1. From the repo root:
-```
+
+1. Activate the virtual environment from the repo root:
+
+```powershell
 source .venv/Scripts/activate
 ```
-### You must see:
 
-`(.venv)`
+You should see:
 
-
-2. Make sure dependencies are installed
+```powershell
+(.venv)
 ```
+
+2. Install the dependencies:
+
+```powershell
 pip install -r requirements.txt
 ```
 
-# Test the semantic search logic
+# Run the App
 
-Place a sample.pdf in the repo root (same level as requirements.txt)
+Start the FastAPI server with:
 
-Run:
-```
-python test_search.py
-```
-
-Run the FastAPI server:
-```
+```powershell
 uvicorn app.main:app --reload
 ```
 
-### You should see: Uvicorn running on http://127.0.0.1:8000
+You should then see Uvicorn running and a message:
 
-### Test the API
-
-Health check: http://127.0.0.1:8000/health
-
-Expected:
-
+```text
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
 ```
+
+# API Endpoints
+
+## Health Check
+
+Open:
+
+```text
+http://127.0.0.1:8000/health
+```
+
+Expected response:
+
+```json
 {"status":"ok"}
 ```
+
+## Swagger UI
+
+Open:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+This is the easiest way to test the API in the browser.
+
+## POST `/search`
+
+This endpoint now allows the user to upload a PDF directly and search it in the same request.
+
+Required form fields:
+- `file`: the PDF document to upload
+- `question`: the question you want to ask about the document
+
+Optional form field:
+- `top_k`: number of matching results to return, default is `3`
+
+Only PDF files are supported.
+
+Example using `curl`:
+
+```powershell
+curl -X POST "http://127.0.0.1:8000/search" ^
+  -F "file=@sample.pdf;type=application/pdf" ^
+  -F "question=What is this document about?" ^
+  -F "top_k=3"
+```
+
+Example response shape:
+
+```json
+{
+  "question": "What is this document about?",
+  "top_k": 3,
+  "results": [
+    {
+      "text": "...",
+      "score": 0.0,
+      "page": 1
+    }
+  ]
+}
+```
+
+# Test the Semantic Search Logic
+
+There is also a local script for testing the search logic outside the API.
+
+Place a `sample.pdf` in the repo root, then run:
+
+```powershell
+python test_search.py
+```
+
 
 ### Swagger UI
 http://127.0.0.1:8000/docs

@@ -19,8 +19,37 @@ def load_pdf(path):
             })
     return pages
 
+def _chunk_text(text, chunk_size=600, overlap=120):
+    text = " ".join(text.split())
+    if not text:
+        return []
+
+    chunks = []
+    start = 0
+    text_length = len(text)
+
+    while start < text_length:
+        end = min(start + chunk_size, text_length)
+        chunks.append(text[start:end].strip())
+        if end == text_length:
+            break
+        start = max(end - overlap, start + 1)
+
+    return chunks
+
 def search(pages, question, top_k=3):
-    texts = [p["text"] for p in pages]
+    snippets = []
+    for page in pages:
+        for chunk in _chunk_text(page["text"]):
+            snippets.append({
+                "page": page["page"],
+                "text": chunk,
+            })
+
+    if not snippets:
+        return []
+
+    texts = [snippet["text"] for snippet in snippets]
     embeddings = model.encode(texts, convert_to_tensor=True)
     query_embedding = model.encode(question, convert_to_tensor=True)
 
@@ -35,8 +64,8 @@ def search(pages, question, top_k=3):
     for score, idx in zip(best.values, best.indices):
         idx = int(idx)
         results.append({
-            "page": pages[idx]["page"],
+            "page": snippets[idx]["page"],
             "score": float(score),
-            "snippet": pages[idx]["text"]
+            "snippet": snippets[idx]["text"]
         })
     return results
