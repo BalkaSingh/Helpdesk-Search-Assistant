@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from pathlib import Path
 import uuid
 
@@ -20,22 +20,39 @@ def health():
 @app.post("/search")
 async def search_pdf(
     file: UploadFile = File(...),
-    question: str = Form(...),
-    top_k: int = Form(3),
+    question: str = Form(..., min_length=1, max_length=2000),
+    top_k: int = Form(3, ge=1, le=20),
 ):
-    # Basic validation
-    if file.content_type not in ("application/pdf",):
-        return {"error": "Only PDF files are supported."}
+    # Strip removes leading and trailing whitespace, including spaces and newlines.
+    question = question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Question must not be blank.")
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
 
     # Save uploaded PDF
     file_id = uuid.uuid4().hex
     pdf_path = UPLOAD_DIR / f"{file_id}.pdf"
 
-    contents = await file.read()
     pdf_path.write_bytes(contents)
 
     # Run semantic search
-    pages = load_pdf(str(pdf_path))
+    try:
+        pages = load_pdf(str(pdf_path))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not pages:
+        raise HTTPException(
+            status_code=422,
+            detail="The PDF has no extractable text. Scanned PDFs may need OCR.",
+        )
+
     results = search(pages, question, top_k=top_k)
 
     return {

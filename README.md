@@ -9,10 +9,20 @@ The API returns:
 
 # Environment Setup
 
-1. Activate the virtual environment from the repo root:
+1. Install Python 3.11 if needed, then open a new PowerShell terminal. From the
+repo root, create a virtual environment (only needed for initial setup):
 
 ```powershell
-source .venv/Scripts/activate
+python -m venv .venv
+```
+
+A virtual environment keeps this project's Python packages separate from other
+projects.
+
+2. Activate the virtual environment from the repo root:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
 You should see:
@@ -21,10 +31,10 @@ You should see:
 (.venv)
 ```
 
-2. Install the dependencies:
+3. Install the dependencies:
 
 ```powershell
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 # Run the App
@@ -32,8 +42,17 @@ pip install -r requirements.txt
 Start the FastAPI server with:
 
 ```powershell
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
+
+You can also run the app without activating the environment. This is useful if
+PowerShell blocks `Activate.ps1`:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+The explicit path selects the project's Python interpreter directly.
 
 You should then see Uvicorn running and a message:
 
@@ -77,16 +96,26 @@ Required form fields:
 - `question`: the question you want to ask about the document
 
 Optional form field:
-- `top_k`: number of matching results to return, default is `3`
+- `top_k`: number of matching results to return, from `1` to `20`; default is `3`
 
-Only PDF files are supported.
+Only PDF files are supported. Questions must contain non-whitespace text and
+must be no longer than 2,000 characters before trimming.
+
+Invalid requests return an HTTP error with a `detail` field:
+
+- `400`: empty, unreadable, or password-protected PDF (or a file that is not a PDF)
+- `415`: upload content type is not `application/pdf`
+- `422`: invalid question or `top_k`, or a PDF with no extractable text
+
+Scanned PDFs may contain images rather than text. Reading their words requires
+OCR (optical character recognition), which this project does not yet implement.
 
 Example using `curl`:
 
 ```powershell
-curl -X POST "http://127.0.0.1:8000/search" ^
-  -F "file=@sample.pdf;type=application/pdf" ^
-  -F "question=What is this document about?" ^
+curl.exe -X POST "http://127.0.0.1:8000/search" `
+  -F "file=@sample.pdf;type=application/pdf" `
+  -F "question=What is this document about?" `
   -F "top_k=3"
 ```
 
@@ -98,7 +127,7 @@ Example response shape:
   "top_k": 3,
   "results": [
     {
-      "text": "...",
+      "snippet": "...",
       "score": 0.0,
       "page": 1
     }
@@ -115,6 +144,11 @@ Place a `sample.pdf` in the repo root, then run:
 ```powershell
 python test_search.py
 ```
+
+To check validation in `/docs`, try a normal PDF with `top_k=3`, then repeat
+with `top_k=-1`, a question containing only spaces, and an empty file. Expect
+`200`, `422`, `422`, and `400`, respectively. A PDF with no extractable text
+should return `422` instead of an unexplained empty result list.
 
 
 ### Swagger UI

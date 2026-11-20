@@ -6,17 +6,22 @@ from sentence_transformers import SentenceTransformer, util
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def load_pdf(path):
-    doc = fitz.open(path)
-    # Each page is a dict that containes a page number 
-    pages = []
-    # Loop through the doc and retrieve each index (starting at 0) & page (Page object)
-    for i, page in enumerate(doc):
-        text = page.get_text("text")
-        if text.strip():
-            pages.append({
-                "page": i + 1,
-                "text": text
-            })
+    try:
+        # A context manager closes the document even if text extraction fails.
+        with fitz.open(path) as doc:
+            if not doc.is_pdf:
+                raise ValueError("The uploaded file is not a PDF.")
+            if doc.needs_pass:
+                raise ValueError("Password-protected PDFs are not supported.")
+
+            pages = []
+            # enumerate starts at zero; PDF page numbers start at one.
+            for i, page in enumerate(doc):
+                text = page.get_text("text")
+                if text.strip():
+                    pages.append({"page": i + 1, "text": text})
+    except (fitz.FileDataError, fitz.EmptyFileError) as exc:
+        raise ValueError("The uploaded file is not a readable PDF.") from exc
     return pages
 
 def _chunk_text(text, chunk_size=600, overlap=120):
